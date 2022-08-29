@@ -1,0 +1,719 @@
+from operator import concat
+import os
+from turtle import color
+from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+ #hacer una secuencia de 20 numeros aleatorios entre 0 y 1               
+def aleatorios(N):
+    secuencia=np.random.randint(2, size=N)
+    return secuencia
+
+
+
+#funcion para convertir una cadena en digitos
+def digitos(secuencia):
+    digi=secuencia
+    if type(secuencia)==str:
+        for i in secuencia:
+            #almacenar los digitos en un array
+            digi = [int(i) for i in str(secuencia)]
+    return digi
+
+    
+    
+    
+def bifase(Nt,N,izq,dere):
+    #if izq isnt an array then convert it to one with lenght N, and all elements are the value of izq
+    if type(izq)==int:
+        izq = [izq]*N
+    #if dere isnt an array then convert it to one with lenght N, and all elements are the value of dere
+    if type(dere)==int:
+        dere = [dere]*N 
+    pulso=np.array([])
+    pulso2=np.array([])
+    for i in range (N):
+        pulso2=[izq[i]]*(Nt//N//2)
+        pulso=np.concatenate((pulso,pulso2))
+        pulso2=[dere[i]]*(Nt//N//2)
+        pulso=np.concatenate((pulso,pulso2))
+    return pulso
+
+
+#Para hacer la alternacion +-A unicamente en los unos
+#ejemplos: 1111=1-11-1
+#101101=10-110-1
+#000=000
+#01001=0100-1
+def inversor(N,bits,inicio):
+    #Si inicio=1 entonces 1111=1-11-1
+    #Si inicio=-1 entonces 1111=-11-11
+    #copiar bits en resultado
+    #no se puede usar resultado=bits, pues en python se entiende como una asignacion
+    #a la misma direccion de memoria y los cambios en "resultado"  afectan a "bits"
+    resultado=list(bits)
+    for i in range(N):
+        if bits[i]==max(bits):
+            resultado[i]=bits[i]*inicio
+            inicio=inicio*-1
+    return resultado
+#Para que los ceros tengan el valor de menos A
+def bipolarizador(N,bits,v_bit,menosA):
+    #v_bit=0, menosA=-1
+    resultado=list(bits)
+    for i in range(N):
+        if bits[i]==v_bit:
+            resultado[i]=menosA
+    return resultado
+    
+ 
+ 
+#1. AMI
+def AMI(N,bits):
+    resultado=inversor(N,bits,-1)
+    return resultado
+    
+#2. manchester
+def manchester(N,bits):
+    bits2=np.array([])
+    bits3=np.array([])
+    #creamos 2 casos
+    #con los que se cubre las combinaciones de transciciones
+    for i in range (N):
+        if bits[i]==1:
+            bits2=[1,-1]
+        else: 
+            bits2=[-1,1]
+        bits3=np.concatenate((bits3,bits2))
+    return bits3
+#3. manchesd
+def manchesd(N,bits):
+    #Asumimos que el previo fue transcicion positiva
+    if bits[0]==1:
+        bits2=[1,-1]
+    else:
+        bits2=[-1,1]
+    bits3=np.array([])
+    bits3=np.concatenate((bits3,bits2))
+    #Operamos a partir del 2do bit de la original, creando 4 casos
+    #con los que se cubre las combinaciones de transciciones
+    #previas vs bit actual
+    for i in range (1,N):
+        if bits[i]==1:
+            if bits2[1]==1:
+                bits2=[1,-1]
+            elif bits2[1]==-1:
+                bits2=[-1,1]
+        else: 
+            if bits2[1]==1:
+                bits2=[-1,1]
+            elif bits2[1]==-1:
+                bits2=[1,-1]
+        bits3=np.concatenate((bits3,bits2))
+    return bits3
+            
+                
+        
+        
+#4. Para aplicar 4B3T
+#y cuando el resultado es 0??
+def codigo_4B3T(bits,inicio):
+    bits3=np.array([])
+    trama=np.array([])
+    total=inicio
+    total=2#se asume un estado previo de +2 
+    for i in range(0,len(bits),4):
+        trama=np.array([])
+        trama=np.concatenate((trama,bits[i:i+4]))
+            #siempre primero codifico el modo negativo
+            #dado que cuando total es >0 se toma el modo negativo
+            #Cuando total es 0 se toma el modo positivo
+        if np.array_equal(trama,[0,0,0,0]):#CASO 1
+            bits2=[0,-1,1]
+            v=0
+        elif np.array_equal(trama,[0,0,0,1]):#CASO 2
+            bits2=[-1,1,0]
+            v=0
+        elif np.array_equal(trama,[0,0,1,0]):#CASO 3
+            bits2=[-1,0,1]
+            v=0
+        elif np.array_equal(trama,[0,0,1,1]):#CASO 4
+            if total>0:
+                bits2=[-1,1,-1]
+                v=-1
+            else:
+                bits2=[1,-1,1]
+                v=1
+        elif np.array_equal(trama,[0,1,0,0]):#CASO 5
+            if total>0:
+                bits2=[0,-1,-1]
+                v=-2
+            else:
+                bits2=[0,1,1]
+                v=2  
+        elif np.array_equal(trama,[0,1,0,1]):#CASO 6
+            if total>0:
+                bits2=[0,-1,0]
+                v=-1
+            else:
+                bits2=[0,1,0]
+                v=1
+        elif np.array_equal(trama,[0,1,1,0]):#CASO 7
+            if total>0:
+                bits2=[0,0,-1]
+                v=-1
+            else:
+                bits2=[0,0,1]
+                v=1    
+        elif np.array_equal(trama,[0,1,1,1]):#CASO 8
+            if total>0:
+                bits2=[1,-1,-1]
+                v=-1
+            else:
+                bits2=[-1,1,1]
+                v=1   
+        elif np.array_equal(trama,[1,0,0,0]):#CASO 9
+            bits2=[0,1,-1]
+            v=0
+        elif np.array_equal(trama,[1,0,0,1]):#CASO 10
+            bits2=[1,-1,0]
+            v=0
+        elif np.array_equal(trama,[1,0,1,0]):#CASO 11
+            bits2=[1,0,-1]
+            v=0
+        elif np.array_equal(trama,[1,0,1,1]):#CASO 12
+            if total>0:
+                bits2=[-1,0,0]
+                v=-1
+            else:
+                bits2=[1,0,0]
+                v=1    
+        elif np.array_equal(trama,[1,1,0,0]):#CASO 13
+            if total>0:
+                bits2=[-1,0,-1]
+                v=-2
+            else:
+                bits2=[1,0,1]
+                v=2  
+        elif np.array_equal(trama,[1,1,0,1]):#CASO 14
+            if total>0:
+                bits2=[-1,-1,0]
+                v=-2
+            else:
+                bits2=[1,1,0]
+                v=2    
+        elif np.array_equal(trama,[1,1,1,0]):#CASO 15
+            if total>0:
+                bits2=[-1,-1,1]
+                v=-1
+            else:
+                bits2=[1,1,-1]
+                v=1
+        elif np.array_equal(trama,[1,1,1,1]):#CASO 16
+            if total>0:
+                bits2=[-1,-1,-1]
+                v=-3
+            else:
+                bits2=[1,1,1]
+                v=3    
+        else:
+            bits2=[0,0,0]
+            v=-1 
+        bits3=np.concatenate((bits3,bits2))
+        total=total+v
+    
+    return bits3
+   
+   
+                
+#5. Para aplicar HDB3
+#modificar para añadir el bit de relleno                
+def HDB3(N,bits):
+    auxiliar1=np.array([])
+    resultado=np.array([])
+    contador=0
+    pulso_anterior=0
+    pulso_violacion=1
+    for i in bits:
+        if i==1:
+            if pulso_anterior==1:
+                auxiliar1=np.concatenate((auxiliar1,[-1]))
+                pulso_anterior=-1
+                pulso_violacion=-1
+            elif pulso_anterior==-1:
+                auxiliar1=np.concatenate((auxiliar1,[1]))
+                pulso_anterior=1
+                pulso_violacion=1
+            elif pulso_anterior==0:
+                auxiliar1=np.concatenate((auxiliar1,[i]))
+                pulso_anterior=i
+                pulso_violacion=i
+        elif i==0:
+            contador=contador+1
+            if contador==4:
+                auxiliar1=auxiliar1[:-3]
+                auxiliar1=np.concatenate((auxiliar1,[0,0,0,pulso_violacion]))
+            else:
+                auxiliar1=np.concatenate((auxiliar1,[i]))
+    resultado=np.concatenate((resultado,auxiliar1))
+    return resultado
+   
+#6. 4B5B
+def codigo_4B5B(bits):
+    bits3=np.array([])
+    trama=np.array([])
+    for i in range(0,len(bits),4):
+        trama=np.array([])
+        trama=np.concatenate((trama,bits[i:i+4]))
+        if np.array_equal(trama,[0,0,0,0]):#CASO 1
+            bits2=[1,1,1,1,0]
+        elif np.array_equal(trama,[0,0,0,1]):#CASO 2
+            bits2=[0,1,0,0,1]
+        elif np.array_equal(trama,[0,0,1,0]):#CASO 3
+            bits2=[1,0,1,0,0]
+        elif np.array_equal(trama,[0,0,1,1]):#CASO 4
+            bits2=[1,0,1,0,1]
+        elif np.array_equal(trama,[0,1,0,0]):#CASO 5
+            bits2=[0,1,0,1,0]
+        elif np.array_equal(trama,[0,1,0,1]):#CASO 6
+            bits2=[0,1,0,1,1]
+        elif np.array_equal(trama,[0,1,1,0]):#CASO 7
+            bits2=[0,1,1,1,0]
+        elif np.array_equal(trama,[0,1,1,1]):#CASO 8
+            bits2=[0,1,1,1,1]
+        elif np.array_equal(trama,[1,0,0,0]):#CASO 9
+            bits2=[1,0,0,1,0]
+        elif np.array_equal(trama,[1,0,0,1]):#CASO 10
+            bits2=[1,0,0,1,1]
+        elif np.array_equal(trama,[1,0,1,0]):#CASO 11
+            bits2=[1,0,1,1,0]
+        elif np.array_equal(trama,[1,0,1,1]):#CASO 12
+            bits2=[1,0,1,1,1]
+        elif np.array_equal(trama,[1,1,0,0]):#CASO 13
+            bits2=[1,1,0,1,0]
+        elif np.array_equal(trama,[1,1,0,1]):#CASO 14
+            bits2=[1,1,0,1,1]
+        elif np.array_equal(trama,[1,1,1,0]):#CASO 15
+            bits2=[1,1,1,0,0]
+        elif np.array_equal(trama,[1,1,1,1]):#CASO 16
+            bits2=[1,1,1,0,1]
+        else:
+            bits2=[0,0,0,0,0]
+        bits3=np.concatenate((bits3,bits2))    
+    return bits3
+
+#7.5B6B
+def codigo_5B6B(bits,inicio):
+    bits3=np.array([])
+    trama=np.array([])
+    total=inicio
+    for i in range(0,len(bits),5):
+        trama=np.array([])
+        trama=np.concatenate((trama,bits[i:i+5]))
+            #cuando total es -1 se toma el modo negativo
+            #Cuando total es +1 se toma el modo positivo
+        if np.array_equal(trama,[0,0,0,0,0]):#CASO 1
+            if total>0:
+                bits2=[0,1,1,1,0,1]
+            else:
+                bits2=[1,0,0,0,1,0]        
+        elif np.array_equal(trama,[0,0,0,0,1]):#CASO 2
+            if total>0:
+                bits2=[1,0,1,1,1,0]
+            else:
+                bits2=[0,1,0,0,0,1]
+        elif np.array_equal(trama,[0,0,0,1,0]):#CASO 3
+            if total>0:
+                bits2=[0,1,0,1,1,1]
+            else:
+                bits2=[1,0,1,0,0,0]
+        elif np.array_equal(trama,[0,0,0,1,1]):#CASO 4
+            bits2=[0,0,0,1,1,1]
+        elif np.array_equal(trama,[0,0,1,0,0]):#CASO 5
+            if total>0:
+                bits2=[1,0,1,0,1,1]
+            else:
+                bits2=[0,1,0,1,0,0]
+        elif np.array_equal(trama,[0,0,1,0,1]):#CASO 6
+            bits2=[0,0,1,0,1,1]
+        elif np.array_equal(trama,[0,0,1,1,0]):#CASO 7
+            bits2=[0,0,1,1,0,1]
+        elif np.array_equal(trama,[0,0,1,1,1]):#CASO 8
+            bits2=[0,0,1,1,1,0]
+        elif np.array_equal(trama,[0,1,0,0,0]):#CASO 9
+            if total>0:
+                bits2=[1,1,0,1,0,1]
+            else:
+                bits2=[0,0,1,0,1,0]
+        elif np.array_equal(trama,[0,1,0,0,1]):#CASO 10
+            bits2=[0,1,0,0,1,1]
+        elif np.array_equal(trama,[0,1,0,1,0]):#CASO 11
+            bits2=[0,1,0,1,0,1]
+        elif np.array_equal(trama,[0,1,0,1,1]):#CASO 12
+            bits2=[0,1,0,1,1,0]
+        elif np.array_equal(trama,[0,1,1,0,0]):#CASO 13
+            bits2=[0,1,1,0,0,1]
+        elif np.array_equal(trama,[0,1,1,0,1]):#CASO 14
+            bits2=[0,1,1,0,1,0]
+        elif np.array_equal(trama,[0,1,1,1,0]):#CASO 15
+            bits2=[0,1,1,1,0,0]
+        elif np.array_equal(trama,[0,1,1,1,1]):#CASO 16
+            if total>0:
+                bits2=[1,1,0,1,1,0]
+            else:
+                bits2=[0,0,1,0,0,1]
+        elif np.array_equal(trama,[1,0,0,0,0]):#CASO 17
+            if total>0:
+                bits2=[1,1,1,0,1,0]
+            else:
+                bits2=[0,0,0,1,0,1]
+        elif np.array_equal(trama,[1,0,0,0,1]):#CASO 18
+            bits2=[1,0,0,0,1,1]
+        elif np.array_equal(trama,[1,0,0,1,0]):#CASO 19
+            bits2=[1,0,0,1,0,1]
+        elif np.array_equal(trama,[1,0,0,1,1]):#CASO 20
+            bits2=[1,0,0,1,1,0]
+        elif np.array_equal(trama,[1,0,1,0,0]):#CASO 21
+            bits2=[1,0,1,0,0,1]
+        elif np.array_equal(trama,[1,0,1,0,1]):#CASO 22
+            bits2=[1,0,1,0,1,0]
+        elif np.array_equal(trama,[1,0,1,1,0]):#CASO 23
+            bits2=[1,0,1,1,0,0]
+        elif np.array_equal(trama,[1,0,1,1,1]):#CASO 24
+            if total>0:
+                bits2=[0,1,1,0,1,1]
+            else:
+                bits2=[1,0,0,1,0,0]
+        elif np.array_equal(trama,[1,1,0,0,0]):#CASO 25
+            bits2=[1,1,0,0,0,1]
+        elif np.array_equal(trama,[1,1,0,0,1]):#CASO 26
+            bits2=[1,1,0,0,1,0]
+        elif np.array_equal(trama,[1,1,0,1,0]):#CASO 27
+            bits2=[1,1,0,1,0,0]
+        elif np.array_equal(trama,[1,1,0,1,1]):#CASO 28
+            if total>0:
+                bits2=[1,0,1,1,0,1]
+            else:
+                bits2=[0,1,0,0,1,0]
+        elif np.array_equal(trama,[1,1,1,0,0]):#CASO 29
+            bits2=[1,1,1,0,0,0]
+        elif np.array_equal(trama,[1,1,1,0,1]):#CASO 30
+            if total>0:
+                bits2=[1,1,0,0,1,1]
+            else:
+                bits2=[0,0,1,1,0,0]
+        elif np.array_equal(trama,[1,1,1,1,0]):#CASO 31
+            if total>0:
+                bits2=[1,0,1,1,0,1]
+            else:
+                bits2=[0,1,0,0,1,0]
+        elif np.array_equal(trama,[1,1,1,1,1]):#CASO 32
+            if total>0:
+                bits2=[1,0,0,1,1,1]
+            else:
+                bits2=[0,1,1,0,0,0]
+        else:
+            bits2=[0,0,0,0,0,0]
+        bits3=np.concatenate((bits3,bits2))
+        total=total*-1
+    
+    return bits3
+  
+#8. 2B1Q
+def codigo_2B1Q(bits):
+    bits3=np.array([])
+    trama=np.array([])
+    for i in range(0,len(bits),2):
+        trama=np.array([])
+        trama=np.concatenate((trama,bits[i:i+2]))
+        if np.array_equal(trama,[1,0]):#CASO 1
+            bits2=[2.5]
+        elif np.array_equal(trama,[1,1]):#CASO 2
+            bits2=[5/6]
+        elif np.array_equal(trama,[0,1]):#CASO 3
+            bits2=[-5/6]
+        elif np.array_equal(trama,[0,0]):#CASO 4
+            bits2=[-2.5]
+        else:
+            bits2=[0]
+        bits3=np.concatenate((bits3,bits2))    
+    return bits3
+
+#9. PST 
+def codigo_PST(bits,inicio):
+    bits3=np.array([])
+    trama=np.array([])
+    total=inicio
+    for i in range(0,len(bits),2):
+        trama=np.array([])
+        trama=np.concatenate((trama,bits[i:i+2]))
+        if np.array_equal(trama,[0,0]):#CASO 1
+            bits2=[-1,1]
+        elif np.array_equal(trama,[0,1]):#CASO 2
+            if total>0:
+                bits2=[0,1]
+            else:
+                bits2=[0,-1]
+            total=total*-1
+        elif np.array_equal(trama,[1,0]):#CASO 3
+            if total>0:
+                bits2=[1,0]
+            else:
+                bits2=[-1,0]
+            total=total*-1
+        elif np.array_equal(trama,[1,1]):#CASO 4
+            bits2=[1,-1]
+        else:
+            bits2=[0,0]
+        bits3=np.concatenate((bits3,bits2)) 
+    return bits3
+#10. MLT-3
+def codigo_MLT3(bits):
+    bits3=np.array([])
+    auxiliar=[1,0,-1,0]
+    contador=0
+    anterior=[0]
+    for i in bits:
+        if i==1:
+            bits2=[auxiliar[contador]]
+            anterior=bits2
+            contador=contador+1
+            bits3=np.concatenate((bits3,bits2))
+            if contador==4:
+                contador=0
+        else:           
+            bits3=np.concatenate((bits3,anterior)) 
+    return bits3  
+ #Para calcular Vs,ts  AB e imprimirlos en pantalla
+def calculos(n,d,Vtx,tb):
+    Vs=(n/d)*Vtx
+    ts=1/Vs
+    AB=Vs/2
+    print(f"La velocidad de transmision es: {Vtx:.2f}[bps]")
+    print(f"El tiempo de bit es: {tb:.2f}[s]")
+    print(f"el tiempo de senial es: {ts:.2f}[s]")
+    print(f"La velocidad de senial es: {Vs:.2f}[baudios]")
+    print(f"El ancho de banda es: {AB:.2f}[Hz]")
+    return ts,Vs,AB
+def main():
+    salirr=0
+    while salirr!=1:   
+        while True:
+            #limpiar pantalla
+            os.system("cls")
+            print("Escuela Politecnica Nacional")
+            print("Fundamentos de Comunicaciones-2022A")
+            print("Bienvenido al programa de codigos de linea")
+            opcion1=input("Presione 1 para una secuencia de bits aleatoria o 2 para ingresar una secuencia de bits: ")
+            if opcion1=="1":
+                secuencia=list(aleatorios(20))
+            else:
+                print("\nA continuacion ingrese la secuencia a codificar de longitud 20")
+                print("ADVERTENCIA: si excede la longitud solo se tomaran los primeros 20 bits, y si es menor se rellenara con ceros")
+                secuencia = [int(x) for x in input("Ingrese la secuencia: ")]
+                if len(secuencia)<20:
+                    for i in range(20-len(secuencia)):
+                        secuencia.append(0)
+                #si la longitud es mayor a 20 solo se toman los primeros 20 bits
+                elif len(secuencia)>20:
+                    secuencia=secuencia[0:20]
+            #secuencia=[1,0,1,0,1,0]
+            #secuencia=[1,0,1,0,1,0,1,0,1,0]
+            #secuencia=[0,0,0,0,0,0,0,0,0,0,0,0]
+            #secuencia=list(aleatorios(20))
+            break
+        print("Los caracteres que ingreso son: ", secuencia)
+        #pedir una velocidad de tipo double al usuario y mostrarlo en pantalla
+        Vtx = float(input("Ingrese una velocidad: "))
+        #Vtx=15
+        tb=1/Vtx
+        print("La velocidad que ingreso es: ", Vtx)
+        bits=digitos(secuencia)
+        N=len(bits)
+        paso=tb/10000
+        #define a time vector from 0 to N*tb-paso
+        t=np.arange(0,N*tb,paso)
+        Nt=len(t)
+        print("Introdujo",N,"digitos")
+        reloj=bifase(Nt,N,2,-2)
+        senial=bifase(Nt,N,bits,bits)
+        while True:  
+            fig, axs = plt.subplots(3)
+            #letras en negrita
+            fig.suptitle('Maximice para mejor visualizacion o cierre la ventana para continuar',color='red',font='Arial',fontweight='bold')
+            #separar los subplots
+            fig.subplots_adjust(hspace=0.5)
+            #activar la rejilla
+            axs[0].grid(True)
+            axs[1].grid(True)
+            axs[2].grid(True)
+            #colocar labels a los ejes
+            #print tb on xlabel with only 2 decimals
+            #axs[0].set_xlabel('Tiempo (s)'+str(round(tb,2)),loc='right',font='Arial',fontweight='bold')
+            axs[0].set_xlabel("Tiempo (s)",loc='right',font='Arial',fontweight='bold')
+            axs[1].set_xlabel('Tiempo (s)',loc='right',font='Arial',fontweight='bold')
+            axs[2].set_xlabel('Tiempo (s)',loc='right',font='Arial',fontweight='bold')
+            axs[0].set_ylabel('Amplitud (V)',font='Arial',fontweight='bold')
+            axs[1].set_ylabel('Amplitud (V)',font='Arial',fontweight='bold')
+            axs[2].set_ylabel('Amplitud (V)',font='Arial',fontweight='bold')
+            #establecer el numero de ticks en los ejes con dos decimales
+            axs[0].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+            axs[0].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+            axs[1].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+            axs[1].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+            #axs[0].xaxis.set_major_locator(MaxNLocator(22))
+            #axs[1].xaxis.set_major_locator(MaxNLocator(22))
+            #axs[2].xaxis.set_major_locator(MaxNLocator(22))
+            #graficar las seniales
+            axs[0].plot(t, reloj, color='black')
+            axs[1].plot(t, senial, color='darkorange')
+            #colocar titulos a los subplots
+            axs[0].set_title('Reloj',font='Arial',fontweight='bold')
+            axs[1].set_title(f'Senial original: Vtx={Vtx:.2f}[bps], tb={tb:.2f}[s]',font='Arial',fontweight='bold')
+            print("Seleccione el codigo de linea a utilizar y a continuacion la senial codificada se mostrara en una nueva ventana")
+            print("""\
+                1. AMI
+                2. MANCHESTER
+                3. MANCHESTER DIFF
+                4. 4B3T
+                5. HDB3
+                6. 4B5B
+                7. 5B6B
+                8. 2B1Q
+                9. PST
+                10. MLT-3
+                11. Reiniciar el programa(reingresar secuencia de bits)
+                12. Salir""")
+            opcion = input("Ingrese el numero de la opcion deseada: ")
+            figManager = plt.get_current_fig_manager()
+            figManager.window.showMaximized()
+            if opcion == "1":#AMI
+                #empieza con -1
+                ts,Vs,AB=calculos(1,1,Vtx,tb)
+                reescrito=AMI(N,bits)
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'AMI: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()              
+            elif opcion == "2":#MANCHESTER
+                #1L transcicion negativa +A->-A
+                #0L transcicion positiva -A->+A
+                ts,Vs,AB=calculos(2,1,Vtx,tb)
+                reescrito=manchester(N,bits)
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'MANCHESTER: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "3":#MANCHESTER DIFF
+                #Empieza con transcicion negativa +A->-A
+                #1L cambia la transcicion anterior
+                #0L=mantiene la transcicion anterior
+                ts,Vs,AB=calculos(2,1,Vtx,tb)
+                reescrito=manchesd(N,bits)
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'MANCHESTER DIFERENCIAL: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "4":#4B3T
+                ts,Vs,AB=calculos(3,4,Vtx,tb)
+                reescrito=codigo_4B3T(bits,2)#2 inicia con disparidad +2
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                if len(codigo)!=len(t):
+                    for i in range(len(t)-len(codigo)):
+                        codigo=np.concatenate((codigo,[codigo[len(codigo)-1]]))
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'4B3T: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "5":#HDB3
+                #1L van alternandose +A:-A
+                #0L es cero excepto cuando son 4 seguidos entoces hago 000V
+                #V significa igual amplitud al anterior 1L
+                #1L luego de la violacion se alterna respecto a ella
+                #si la vilacion no se alterna respecto a la anterior, se usa un B de relleno B000V
+                #Donde ambos tienen la amplitud contraria a la anterior violacion
+                ts,Vs,AB=calculos(1,1,Vtx,tb)
+                reescrito=HDB3(N,bits)
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'HDB3: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "6":#4B5B
+                ts,Vs,AB=calculos(5,4,Vtx,tb)
+                reescrito=codigo_4B5B(bits)
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                if len(codigo)!=len(t):
+                    for i in range(len(t)-len(codigo)):
+                        codigo=np.concatenate((codigo,[codigo[len(codigo)-1]]))
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'4B5B: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "7":#5B6B
+                ts,Vs,AB=calculos(6,5,Vtx,tb)
+                reescrito=codigo_5B6B(bits,1)#1 inicia positivo, -1 negativo
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                if len(codigo)!=len(t):
+                    for i in range(len(t)-len(codigo)):
+                        codigo=np.concatenate((codigo,[codigo[len(codigo)-1]]))
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'5B6B: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "8":#2B1Q
+                ts,Vs,AB=calculos(1,2,Vtx,tb)
+                reescrito=codigo_2B1Q(bits)
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'2B1Q: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "9":#PST
+                ts,Vs,AB=calculos(1,1,Vtx,tb)
+                reescrito=codigo_PST(bits,1)#1 inicia positivo, -1 negativo
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'PST: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "10":#MLT3
+                ts,Vs,AB=calculos(1,1,Vtx,tb)
+                reescrito=codigo_MLT3(bits)#1 inicia positivo, -1 negativo
+                codigo=bifase(Nt,len(reescrito),reescrito,reescrito)
+                axs[2].plot(t, codigo, color='tab:blue')
+                axs[2].set_title(f'MLT3: Vs={Vs:.2f}[baudios], ts={ts:.2f}[s], AB={AB:.2f}[HZ]',font='Arial',fontweight='bold')
+                axs[2].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+                axs[2].xaxis.set_ticks(np.arange(0, N*tb, step=tb))
+                plt.show()
+            elif opcion == "11":
+                #restar main loop
+                print("Reiniciando...")
+                plt.close("all")
+                break
+            elif opcion == "12":
+                print("Adios")
+                salirr=1
+                plt.close("all")
+                exit()
+            else:
+                print("Opcion invalida")
+                
+                
+            
+            
+main()
+
